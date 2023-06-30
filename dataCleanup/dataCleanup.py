@@ -1,16 +1,16 @@
 import os
-#import openpyxl
-#import glob
 import pdfplumber
 import pandas as pd
 from openpyxl import load_workbook
 import shutil
 from shutil import copy2
-#import sys
-#from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 import re
 from datetime import datetime, timedelta
+#import openpyxl
+#import glob
+#import sys
+#from openpyxl import Workbook
 
 # Define the names & locations of folders and format / data files
 BASE_DIR = os.getcwd()
@@ -159,6 +159,7 @@ def extract_data(sheet):
         #print(f"Found matching id")
     else: 
         print(f"Potential Error")
+        global recognization
         recognization = False
         filtered_data = physical_data_locations_df[
             (physical_data_locations_df['city'] == city) &
@@ -197,7 +198,9 @@ def get_name(input_str):
     for name, value in name_to_value.items():
         if name in input_str:
             return value
-    recognization = False
+        else:
+            global recognization
+            recognization = False
     return 'Un-identified Trader'
 
 # Change name of pipelines to the default one recorded in the system
@@ -215,7 +218,9 @@ def get_pipeline(input_str):
     for name, value in name_to_value.items():
         if name in input_str:
             return value
-    recognization = False
+        else: 
+            global recognization
+            recognization = False
     return 'Un-identified Pipeline'
 
 # Printing the data collected to the corresponding excel files, including constant data
@@ -236,7 +241,7 @@ def update_sheet(sheet, data):
         sheet['B5'] = buyer
         sheet['B14'] = sellerAttn
         quantityA *= -1
-    sheet['B7'] = ''
+    #sheet['B7'] = ''
     sheet['B8'] = delivery_date_start.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/")
     sheet['B9'] = delivery_date_end.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/")
     sheet['B10'] = quantityA
@@ -244,7 +249,7 @@ def update_sheet(sheet, data):
     sheet['B12'] = '±0%'
     sheet['B13'] = 'FIP'
     sheet['B15'] = 'Crude_AM'
-    sheet['B16'] = ''
+    #sheet['B16'] = ''
     sheet['B17'] = 'Pipeline'
     sheet['B18'] = f"{city}, {state}, {country}"    
     sheet['B19'] = pipeline
@@ -272,6 +277,7 @@ def copy_format_to_sheet(format_file_name, sheet):
 
 def cleanup_data(target_dir):
     files = load_files(target_dir)
+    all_recognized = True
 
     for file in files:
         book = load_workbook(os.path.join(target_dir, file))
@@ -288,6 +294,11 @@ def cleanup_data(target_dir):
         update_sheet(sheet2, data)
 
         book.save(os.path.join(target_dir, file))
+
+        if 'Un-identified' in data:
+            all_recognized = False
+
+    return all_recognized
 
 # PDF Plumber that changes broker pdf to excel
 def extract_text_from_pdf(pdf_path):
@@ -336,11 +347,15 @@ def main():
             output_file = os.path.join(DATA_DIR, pdf.replace('.pdf', '.xlsx'))
             write_to_excel(text, output_file)
 
-    cleanup_data(DATA_DIR)
+    all_recognized = cleanup_data(DATA_DIR)
     copy_files(DATA_DIR, RESULT_DIR)
     copy_format_to_each_file(RESULT_DIR, FORMAT_FILE)
-    if recognization == True: print(f"Success! Trader and Pipeline all Recognized")
-    else: print(f"Error! Trader or Pipeline may not be Completed")
+    
+    if all_recognized:
+        print(f"Success! Trader and Pipeline all Recognized")
+    else: 
+        print(f"Error! Trader or Pipeline may not be Completed in some files within directory: {DATA_DIR}")
+
 
 if __name__ == "__main__":
     main()
