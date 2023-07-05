@@ -5,12 +5,10 @@ from openpyxl import load_workbook
 import shutil
 from shutil import copy2
 from openpyxl.utils import get_column_letter
-import re
-from datetime import datetime, timedelta
-#import openpyxl
-#import glob
-#import sys
-#from openpyxl import Workbook
+from openpyxl import Workbook
+from LinkCrudeResourcesLLC import extract_data_link_crude
+from CirtronCommoditiesLLC import extract_data_citron_commodities
+from ModernCommoditiesINC import extract_data_modern_commodities
 
 # Define the names & locations of folders and format / data files
 BASE_DIR = os.getcwd()
@@ -19,7 +17,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 RESULT_DIR = os.path.join(BASE_DIR, "results")
 FORMAT_FILE = os.path.join(BASE_DIR, "format.xlsx")
 physical_data_locations = os.path.join(BASE_DIR, "physical_data_locations.xlsx")
-recognization = True
+recognization = {}
 
 # Copy every excel from one folder to another
 def copy_files(source_dir, target_dir):
@@ -60,211 +58,110 @@ def load_files(directory, extension=None):
     else:
         return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-# Main body of finding each piece of necesary data and changing them to usable format
-def extract_data(sheet):
-    (transaction_date, transaction_type, seller, buyer, pipeline, sellerAttn, buyerAttn, 
-    quantityA, quantityB, broker, brokerDocID, pricingDetail, pricingType, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, city, state, country, id_, company) = (None,) * 22
 
+broker_to_function_map = {
+    "Broker Link Crude": extract_data_link_crude,
+    "Broker Citron Commodities": extract_data_citron_commodities,
+    "Broker Modern Commodities": extract_data_modern_commodities,
+    # Add more broker and values here...
+}
+
+def identify_broker(sheet):
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
             if isinstance(cell, str):
-                if 'Transaction Date:' in cell:
-                    transaction_date = cell.split(':')[1].strip()
-                elif 'Transaction Type:' in cell:
-                    transaction_type = cell.split(':')[1].strip()
-                    if transaction_type == 'Exchange':
-                        transaction_type = 1
-                    elif transaction_type == 'Outright':
-                        transaction_type = 0
-                    else: transaction_type = -1
-                elif 'Seller:' in cell:
-                    seller = cell.split(':')[1].strip()
-                elif 'Buyer:' in cell:
-                    buyer = cell.split(':')[1].strip()
-                elif 'Pipeline:' in cell:
-                    pipeline = get_pipeline(cell.split(':')[1].strip())
-                elif 'F.O.B.:' in cell:
-                    city = cell.split(':')[1].strip()
-                elif 'Seller Attn:' in cell:
-                    sellerAttn = get_name(cell.split(':')[1].strip())
-                elif 'Buyer Attn:' in cell:
-                    buyerAttn = get_name(cell.split(':')[1].strip())
-                elif 'Total Volume:' in cell:
-                    quantityA_str = cell.split(':')[1].strip()
-                    quantityA_str = re.sub('[^\d,]', '', quantityA_str)
-                    quantityA_str = quantityA_str.replace(',', '')
-                    quantityA = int(quantityA_str)
-                elif 'Barrels' in cell:
-                    quantityB = 'BBL'
-                elif 'LINK CRUDE RESOURCES, LLC' in cell:
-                    broker = 'LINK CRUDE RESOURCES,LLC'
-                elif 'Price US$/UNIT:' in cell:
-                    pricing_str = cell.split(':')[1].strip()
-                    if pricing_str.startswith('$'):
-                        # It's a simple price, so remove the dollar sign and convert to float
-                        pricing_str = pricing_str.replace('$', '')  
-                        pricingDetail = float(pricing_str)
-                        pricingType = 'Fixed'
-                    else: continue
-                elif 'PLUS $' in cell:
-                    priceing_str_2 = cell.split('$')[1].strip().strip('.')
-                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE +' + priceing_str_2 + ' USD/BBL'
-                    pricingType = 'CMA'
-                elif 'MINUS $' in cell:
-                    priceing_str_2 = cell.split('$')[1].strip().strip('.')
-                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE -' + priceing_str_2 + ' USD/BBL'
-                    pricingType = 'CMA'
-                elif 'BEFORE 20TH OF THE MONTH' in cell:
-                    paymentTerm = '20 days after delivery month-end'
-                elif 'BUYER\'S CREDIT IS SUBJECT TO SELLER\'S APPROVAL' in cell:
-                    creditTerm = 'Seller\'s discretion'
-                elif 'Delivery Date:' in cell:
-                    delivery_month_year = cell.split(':')[1].strip()
-                    delivery_date_start = datetime.strptime(delivery_month_year, '%B %Y')
-                    delivery_date_end = datetime(delivery_date_start.year, delivery_date_start.month, 1) + timedelta(days=32)
-                    delivery_date_end = delivery_date_end.replace(day=1) - timedelta(days=1)
-                elif 'PetroChina International (America) Inc' in cell:
-                    company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
-                elif 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.' in cell:
-                    company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
-                elif 'Transaction #:' in cell:
-                    brokerDocID = cell.split(':')[1].strip()
+                if 'LINK CRUDE RESOURCES, LLC' in cell:
+                    #print("found Broker Link Crude")
+                    return 'Broker Link Crude'
+                if 'None None' in cell:
+                    #print("found Broker Citron Commodities")
+                    return 'Broker Citron Commodities'
+                if '' in cell:
+                    return 'Broker Modern Commodities'
+    # If no broker found, return None
+    return None
 
-        if transaction_date and transaction_type and seller and buyer and pipeline and city and sellerAttn and buyerAttn and quantityA and quantityB \
-            and broker and brokerDocID and pricingDetail and pricingType and paymentTerm and creditTerm and delivery_date_start and delivery_date_end:
-            break
+def extract_data(sheet, file_name):
+    brokerCompany = identify_broker(sheet)
     
-    # Change city name from HOUSTON to Houston, except for ECHO which is recorded as ECHO
-    if city == 'ECHO':
-        city == city
-    else: city = city.title()
+    if brokerCompany is None:
+        print(f"Could not identify broker in file: {file_name}")
+        return None
 
-    physical_data_locations_df = pd.read_excel('physical_data_locations.xlsx')
-    # Filter the data based on city, pipeline and status
-    filtered_data = physical_data_locations_df[
-        (physical_data_locations_df['city'] == city) &
-        (physical_data_locations_df['pipeline_system'] == pipeline) &
-        (physical_data_locations_df['status'] == 0) &
-        (physical_data_locations_df['booking'] == company)
-    ]
-    print(f"Filtered data: \n{filtered_data}")
-    #print(f"Data: \n{city, pipeline, 0, company}")
+    # Use the appropriate extraction function for the identified broker
+    extraction_function = broker_to_function_map.get(brokerCompany)
+    if extraction_function:
+        return extraction_function(sheet)
+    else:
+        print(f"Could not find extraction function for broker: {brokerCompany}")
 
-    if not filtered_data.empty:
-        matched_row = filtered_data.iloc[0]
-        state = matched_row['state']
-        country = matched_row['country']
-        id_ = matched_row['id']
-        #print(f"Found matching id")
-    else: 
-        print(f"Potential Error")
-        global recognization
-        recognization = False
-        filtered_data = physical_data_locations_df[
-            (physical_data_locations_df['city'] == city) &
-            (physical_data_locations_df['booking'] == company) &
-            (physical_data_locations_df['status'] == 0)
-        ]
-        print(f"Filtered data: \n{filtered_data}")
-        if not filtered_data.empty:
-            matched_row = filtered_data.iloc[0]
-            state = matched_row['state']
-            country = matched_row['country']
-            id_ = 'no corresponding pipeline implis no correct id'
-            pipeline = 'pipeline not found, broker pipeline did not match in database'
-
-    return transaction_date, transaction_type, seller, buyer, pipeline, city, sellerAttn, buyerAttn, quantityA, quantityB, broker, brokerDocID, \
-        pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, state, country, id_
-
-# Change name of employees to the default one recorded in the system
-def get_name(input_str):
-    name_to_value = {
-        'Chuan Chen': 'chenchuan',
-        'Nick Bugos': 'nicholasbugos',
-        'Dan Dubeck': 'danieldubeck', 
-        'Somename' : 'pennychin',
-        'Somename' : 'justintodd',
-        'Somename' : 'quynhtran',
-        'Somename' : 'jjchen',
-        'Somename' : 'yuridashko',
-        'Somename' : 'ryanlowey',
-        'Somename' : 'brycesturdy',
-        'Somename' : 'jameshutchinson',
-        'Somename' : 'oscarmarrero'
-        # Add more names and values here...
-    }
-
-    for name, value in name_to_value.items():
-        if name in input_str:
-            return value
-        else:
-            global recognization
-            recognization = False
-    return 'Un-identified Trader'
-
-# Change name of pipelines to the default one recorded in the system
-def get_pipeline(input_str):
-    name_to_value = {
-        'ENBRIDGE TERMINAL': 'Enbridge',
-        'ENTERPRISE': 'Enterprise',
-        'ZYDECO': 'HOHO',
-        'LOCAP': 'LOOP Pipeline',
-        'MAGELLAN': 'Magellan East houston',
-        'SEAWAY': 'Seaway',
-        # Add more names and values here...
-    }
-
-    for name, value in name_to_value.items():
-        if name in input_str:
-            return value
-        else: 
-            global recognization
-            recognization = False
-    return 'Un-identified Pipeline'
 
 # Printing the data collected to the corresponding excel files, including constant data
-def update_sheet(sheet, data):
-    transaction_date, transaction_type, seller, buyer, pipeline, city, sellerAttn, buyerAttn, quantityA, quantityB, broker, brokerDocID, \
-    pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, state, country, id_  = data
+def update_sheet(sheet, data, filename):
+    transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, broker, brokerDocID, \
+    pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_ = data
 
-    sheet['B1'] = transaction_date
-    sheet['B3'] = transaction_type
-    if buyer is not None and 'PetroChina' in buyer:
+    sheet['B1'] = transaction_date or ""
+    sheet['B3'] = transaction_type or ""
+    #print(f"buyer is", buyer)
+    #print(f"seller is", seller)
+    if buyer and 'PETROCHINA' in buyer and broker == 'LINK CRUDE RESOURCES,LLC':
+        #print("we are buying")
         sheet['B2'] = 'Buy'
         sheet['B4'] = buyer
         sheet['B5'] = seller
-        sheet['B14'] = buyerAttn
+    elif buyer and 'PETROCHINA' in buyer and broker == 'CITRON COMMODITIES LLC':
+        #print(f"we are buying, trader is", trader)
+        sheet['B2'] = 'Buy'
+        sheet['B4'] = buyer
+        sheet['B5'] = seller
+        sheet['B14'] = trader or ""
     else:
+        #print("we are selling")
         sheet['B2'] = 'Sell'
         sheet['B4'] = seller
         sheet['B5'] = buyer
-        sheet['B14'] = sellerAttn
-        quantityA *= -1
-    #sheet['B7'] = ''
-    sheet['B8'] = delivery_date_start.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/")
-    sheet['B9'] = delivery_date_end.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/")
-    sheet['B10'] = quantityA
-    sheet['B11'] = quantityB
+        sheet['B14'] = trader or ""
+        quantityA = -1 * (quantityA or 0)
+
+    try:
+        sheet['B8'] = (delivery_date_start.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/") if delivery_date_start else "")
+        sheet['B9'] = (delivery_date_end.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/") if delivery_date_end else "")
+    except AttributeError:
+        sheet['B8'] = ""
+        sheet['B9'] = ""
+
+    sheet['B10'] = quantityA or ""
+    sheet['B11'] = quantityB or ""
     sheet['B12'] = '±0%'
     sheet['B13'] = 'FIP'
     sheet['B15'] = 'Crude_AM'
-    #sheet['B16'] = ''
     sheet['B17'] = 'Pipeline'
-    sheet['B18'] = f"{city}, {state}, {country}"    
-    sheet['B19'] = pipeline
-    sheet['B22'] = delivery_date_start.strftime('%Y-%m-%d')
-    sheet['B23'] = pricingType
-    sheet['B24'] = pricingDetail
-    sheet['B25'] = paymentTerm
-    sheet['B26'] = creditTerm
+    sheet['B18'] = location or ""  
+    sheet['B19'] = pipeline or ""
+
+    try:
+        sheet['B22'] = (delivery_date_start.strftime('%Y-%m-%d') if delivery_date_start else "")
+    except AttributeError:
+        sheet['B22'] = ""
+
+    sheet['B23'] = pricingType or ""
+    sheet['B24'] = pricingDetail or ""
+    sheet['B25'] = paymentTerm or ""
+    sheet['B26'] = creditTerm or ""
     sheet['B28'] = 'N/A'
     sheet['B29'] = 'No Inspection Fee Associated'
     sheet['B30'] = '0'
     sheet['B32'] = 'USD'
-    sheet['B33'] = broker
-    sheet['B34'] = brokerDocID
-    sheet['B35'] = id_
+    sheet['B33'] = broker or ""
+    sheet['B34'] = brokerDocID or ""
+    sheet['B35'] = id_ or ""
+    
+    if not sheet['B14'].value:
+        recognization[filename] = False
+    if not sheet['B35'].value:
+        recognization[filename] = False
+
 
 def copy_format_to_sheet(format_file_name, sheet):
     format_book = load_workbook(format_file_name)
@@ -273,16 +170,28 @@ def copy_format_to_sheet(format_file_name, sheet):
     for i, column in enumerate(format_sheet.columns, start=1):
         column_letter = get_column_letter(i)
         if column_letter in format_sheet.column_dimensions:
-            sheet.column_dimensions[column_letter].width = format_sheet.column_dimensions[column_letter].width
+            format_width = format_sheet.column_dimensions[column_letter].width
+            sheet.column_dimensions[column_letter].width = format_width
 
 def cleanup_data(target_dir):
     files = load_files(target_dir)
-    all_recognized = True
 
     for file in files:
         book = load_workbook(os.path.join(target_dir, file))
-        sheet1 = book.active  # Changes here
-        data = extract_data(sheet1)
+        for sheet_name in book.sheetnames:
+            sheet1 = book[sheet_name]
+        if sheet1.max_column == 2:
+            for row in sheet1.iter_rows(min_row=2, max_col=2, max_row=sheet1.max_row):
+                cell_A = row[0]
+                cell_B = row[1]
+                cell_A.value = f"{cell_A.value} {cell_B.value}"
+                cell_B.value = None
+            book.save(os.path.join(target_dir, file))
+        data_dict = extract_data(sheet1, file)
+
+        if data_dict is None:
+            print(f"Skipping file {file} due to broker identification issue.")
+            continue  # Skip to the next file
 
         if 'Sheet2' in book.sheetnames:
             sheet2 = book['Sheet2']
@@ -290,15 +199,9 @@ def cleanup_data(target_dir):
             sheet2 = book.create_sheet('Sheet2')
 
         copy_format_to_sheet('format.xlsx', sheet2)
-
-        update_sheet(sheet2, data)
-
+        update_sheet(sheet2, data_dict, file)
         book.save(os.path.join(target_dir, file))
 
-        if 'Un-identified' in data:
-            all_recognized = False
-
-    return all_recognized
 
 # PDF Plumber that changes broker pdf to excel
 def extract_text_from_pdf(pdf_path):
@@ -336,25 +239,31 @@ def main():
     remove_all_files_from_directory(DATA_DIR)
     remove_all_files_from_directory(RESULT_DIR)
 
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-
-    for pdf in os.listdir(PDF_DIR):
-        if pdf.endswith('.pdf'):
-            pdf_path = os.path.join(PDF_DIR, pdf)
+    for file in os.listdir(PDF_DIR):
+        if file.endswith('.pdf'):
+            pdf_path = os.path.join(PDF_DIR, file)
             text = extract_text_from_pdf(pdf_path)
 
-            output_file = os.path.join(DATA_DIR, pdf.replace('.pdf', '.xlsx'))
+            output_file = os.path.join(DATA_DIR, file.replace('.pdf', '.xlsx'))
             write_to_excel(text, output_file)
+        elif file.endswith('.xlsx'):
+            original_wb = load_workbook(os.path.join(PDF_DIR, file))
+            for i, sheet in enumerate(original_wb.sheetnames, start=1):
+                wb = Workbook()
+                new_sheet = wb.active
+                for row in original_wb[sheet].iter_rows():
+                    new_sheet.append((cell.value for cell in row))
+                output_file = os.path.join(DATA_DIR, f"{file.replace('.xlsx', '')}_{i}.xlsx")
+                wb.save(output_file)
 
-    all_recognized = cleanup_data(DATA_DIR)
+    cleanup_data(DATA_DIR)
     copy_files(DATA_DIR, RESULT_DIR)
     copy_format_to_each_file(RESULT_DIR, FORMAT_FILE)
-    
-    if all_recognized:
+    print(DATA_DIR)
+    if recognization:
+        print(f"Error! Trader or Pipeline may not be Completed in these files: {recognization}")
+    else:
         print(f"Success! Trader and Pipeline all Recognized")
-    else: 
-        print(f"Error! Trader or Pipeline may not be Completed in some files within directory: {DATA_DIR}")
 
 
 if __name__ == "__main__":
