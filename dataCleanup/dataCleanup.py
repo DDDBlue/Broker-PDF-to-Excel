@@ -76,7 +76,7 @@ def identify_broker(sheet):
                 if 'None None' in cell:
                     #print("found Broker Citron Commodities")
                     return 'Broker Citron Commodities'
-                if '' in cell:
+                if 'Term Start : ' in cell:
                     return 'Broker Modern Commodities'
     # If no broker found, return None
     return None
@@ -105,12 +105,7 @@ def update_sheet(sheet, data, filename):
     sheet['B3'] = transaction_type or ""
     #print(f"buyer is", buyer)
     #print(f"seller is", seller)
-    if buyer and 'PETROCHINA' in buyer and broker == 'LINK CRUDE RESOURCES,LLC':
-        #print("we are buying")
-        sheet['B2'] = 'Buy'
-        sheet['B4'] = buyer
-        sheet['B5'] = seller
-    elif buyer and 'PETROCHINA' in buyer and broker == 'CITRON COMMODITIES LLC':
+    if buyer and 'PETROCHINA' in buyer:
         #print(f"we are buying, trader is", trader)
         sheet['B2'] = 'Buy'
         sheet['B4'] = buyer
@@ -154,6 +149,7 @@ def update_sheet(sheet, data, filename):
     sheet['B30'] = '0'
     sheet['B32'] = 'USD'
     sheet['B33'] = broker or ""
+    print(brokerDocID)
     sheet['B34'] = brokerDocID or ""
     sheet['B35'] = id_ or ""
     
@@ -180,13 +176,26 @@ def cleanup_data(target_dir):
         book = load_workbook(os.path.join(target_dir, file))
         for sheet_name in book.sheetnames:
             sheet1 = book[sheet_name]
-        if sheet1.max_column == 2:
-            for row in sheet1.iter_rows(min_row=2, max_col=2, max_row=sheet1.max_row):
-                cell_A = row[0]
-                cell_B = row[1]
-                cell_A.value = f"{cell_A.value} {cell_B.value}"
-                cell_B.value = None
-            book.save(os.path.join(target_dir, file))
+            
+            # If the sheet has only two rows of data
+            if sheet1.max_row == 2:
+                transformed_data = []
+                for row in sheet1.iter_rows(min_row=1, max_row=2, values_only=True):
+                    transformed_data.append(row)
+                sheet1.delete_rows(1, 2)
+                for idx, (item_A, item_B) in enumerate(zip(transformed_data[0], transformed_data[1]), start=1):
+                    sheet1.cell(row=idx, column=1, value=f"{item_A} : {item_B}")
+                book.save(os.path.join(target_dir, file))
+
+            # Existing functionality
+            elif sheet1.max_column == 2:
+                for row in sheet1.iter_rows(min_row=2, max_col=2, max_row=sheet1.max_row):
+                    cell_A = row[0]
+                    cell_B = row[1]
+                    cell_A.value = f"{cell_A.value} {cell_B.value}"
+                    cell_B.value = None
+                book.save(os.path.join(target_dir, file))
+
         data_dict = extract_data(sheet1, file)
 
         if data_dict is None:
@@ -201,6 +210,7 @@ def cleanup_data(target_dir):
         copy_format_to_sheet('format.xlsx', sheet2)
         update_sheet(sheet2, data_dict, file)
         book.save(os.path.join(target_dir, file))
+
 
 
 # PDF Plumber that changes broker pdf to excel

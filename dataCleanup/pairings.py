@@ -8,6 +8,7 @@ def get_name(input_str):
     name_to_value = {
         'Chuan Chen': 'chenchuan',
         'Nick Bugos': 'nicholasbugos',
+        'Nicholas Bugos': 'nicholasbugos',
         'Dan Dubeck': 'danieldubeck',
         'Daniel Dubeck': 'danieldubeck',
         'Somename' : 'pennychin',
@@ -40,6 +41,19 @@ def get_pipeline(input_str):
         'SEAWAY': 'Seaway',
         'LOOP': 'LOOP Pipeline',
         'Magellan/Houston': 'Magellan East houston'
+        # Add more names and values here...
+    }
+
+    for name, value in name_to_value.items():
+        if name in input_str:
+            return value
+    return input_str
+
+
+# Change name of city to the default one recorded in the system
+def get_city(input_str):
+    name_to_value = {
+        'JOCO': 'Johnsons Corner',
         # Add more names and values here...
     }
 
