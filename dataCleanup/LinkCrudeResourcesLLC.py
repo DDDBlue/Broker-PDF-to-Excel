@@ -5,11 +5,12 @@ from pairings import get_name, get_pipeline
 
 def extract_data_link_crude(sheet):
     (transaction_date, transaction_type, seller, buyer, pipeline, buyerAttn, sellerAttn, trader, 
-    quantityA, quantityB, broker, brokerDocID, pricingDetail, pricingType, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, id_, company) = ("",) * 24
+    quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
+    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, id_, company, team, currency) = ("",) * 28
                     
     broker = 'LINK CRUDE RESOURCES,LLC'
-    
+    currency = 'USD'
+
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
             if isinstance(cell, str):
@@ -50,13 +51,15 @@ def extract_data_link_crude(sheet):
                         pricingType = 'Fixed'
                     else: continue
                 elif 'PLUS $' in cell:
-                    priceing_str_2 = cell.split('$')[1].strip().strip('.')
-                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE +' + priceing_str_2 + ' USD/BBL'
+                    pricing_str_2 = cell.split('$')[1].strip().strip('.')
+                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE +' + pricing_str_2 + ' USD/BBL'
                     pricingType = 'CMA'
+                    premium = pricing_str_2 + ' USD/BBL'
                 elif 'MINUS $' in cell:
-                    priceing_str_2 = cell.split('$')[1].strip().strip('.')
-                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE -' + priceing_str_2 + ' USD/BBL'
+                    pricing_str_2 = cell.split('$')[1].strip().strip('.')
+                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE -' + pricing_str_2 + ' USD/BBL'
                     pricingType = 'CMA'
+                    premium = '-' + pricing_str_2 + ' USD/BBL'
                 elif 'BEFORE 20TH OF THE MONTH' in cell:
                     paymentTerm = '20 days after delivery month-end'
                 elif 'BUYER\'S CREDIT IS SUBJECT TO SELLER\'S APPROVAL' in cell:
@@ -86,21 +89,29 @@ def extract_data_link_crude(sheet):
         seller = company
         buyer = buyer.upper()
         trader = sellerAttn
+        team = 'Crude_AM'
+        quantityC = '±0%'
     elif 'PetroChina International (America) Inc' in buyer:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         buyer = company
         seller = seller.upper()
         trader = buyerAttn
+        team = 'Crude_AM'
+        quantityC = '±0%'
     elif 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD' in seller:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         seller = company
         buyer = buyer.upper()
         trader = sellerAttn
+        team = 'Crude_Canada'
+        quantityC = '±5%'
     elif 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD' in buyer:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         buyer = company
         seller = seller.upper()
         trader = buyerAttn
+        team = 'Crude_Canada'
+        quantityC = '±5%'
     # Change city name from HOUSTON to Houston, except for ECHO which is recorded as ECHO
     if city == 'ECHO':
         city == city
@@ -141,5 +152,5 @@ def extract_data_link_crude(sheet):
             id_ = 'no corresponding pipeline implis no correct id'
             pipeline = 'pipeline not found, broker pipeline did not match in database'
 
-    return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, broker, brokerDocID, \
-        pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_
+    return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
+        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""

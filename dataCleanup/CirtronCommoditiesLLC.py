@@ -5,12 +5,13 @@ from pairings import get_name, get_pipeline
 
 def extract_data_citron_commodities(sheet):
     (transaction_date, transaction_type, seller, buyer, pipeline, trader, 
-    quantityA, quantityB, broker, brokerDocID, pricingDetail, pricingType, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, id_, company) = ("",) * 22
+    quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
+    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, id_, company, team, currency) = ("",) * 26
 
     petrochina_found = False
     broker = 'CITRON COMMODITIES LLC'
     paymentTerm = '20 days after delivery month-end'
+    currency = 'USD'
 
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
@@ -50,12 +51,16 @@ def extract_data_citron_commodities(sheet):
                     quantityA_str = quantityA_str.replace(',', '')
                     quantityA = int(quantityA_str)
                     quantityB = 'BBL'
+                elif 'EFP' in cell: 
+                    pricingType = 'EFP'
                 elif 'settlement price for the dates' in cell:
                     pricingType = 'Average'
                     if '+0.00' in cell: 
                         pricingDetail = 'Wti/ARGUS/CUSHING/SPOT01/CLOSE/Flat Price/Simple Average +0 USD/BBL'
+                        premium = '0 USD/BBL'
                     elif '+0.01' in cell: 
                         pricingDetail = 'Wti/ARGUS/MidLand/SPOT01/CLOSE/Flat Price/Weighted Average +0.01 USD/BBL'
+                        premium = '0.01 USD/BBL'
                 elif 'Price: ' in cell:
                     if pricingType != 'Average' and pricingType != 'CMA': 
                         pricingType = 'Fixed'
@@ -114,18 +119,26 @@ def extract_data_citron_commodities(sheet):
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         seller = company
         buyer = buyer.upper()
+        team = 'Crude_AM'
+        quantityC = '±0%'
     elif 'Petrochina International (America), Inc.' == buyer:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         buyer = company
         seller = seller.upper()
+        team = 'Crude_AM'
+        quantityC = '±0%'
     elif 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.' == seller:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         seller = company
         buyer = buyer.upper()
+        team = 'Crude_Canada'
+        quantityC = '±5%'
     elif 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.' == buyer:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         buyer = company
         seller = seller.upper()
+        team = 'Crude_Canada'
+        quantityC = '±5%'
 
     physical_data_locations_df = pd.read_excel('physical_data_locations.xlsx')
     # Filter the data based on city, pipeline and status
@@ -161,5 +174,5 @@ def extract_data_citron_commodities(sheet):
             id_ = 'no corresponding pipeline implis no correct id'
             pipeline = 'pipeline not found, broker pipeline did not match in database'
 
-    return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, broker, brokerDocID, \
-        pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_
+    return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
+        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""

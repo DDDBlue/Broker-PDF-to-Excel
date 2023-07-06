@@ -5,13 +5,15 @@ from pairings import get_name, get_pipeline, get_city
 
 def extract_data_modern_commodities(sheet):
     (transaction_date, transaction_type, seller, buyer, pipeline, buyerAttn, sellerAttn, trader, 
-    quantityA, quantityB, broker, brokerDocID, pricingDetail, pricingType, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, id_, company) = ("",) * 24
+    quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
+    creditTerm, delivery_date_start, delivery_date_end, city, state, country, id_, company, team, currency) = ("",) * 28
                     
     broker = 'MODERN COMMODITIES INC.'
     paymentTerm = '20 days after delivery month-end'
     creditTerm = 'Seller\'s discretion'
     pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE'
+    currency = 'USD'
+
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
             if isinstance(cell, str):
@@ -58,6 +60,8 @@ def extract_data_modern_commodities(sheet):
                     quantityA = quantityA * number_of_days
                 elif 'CMA' in cell:
                     pricingType = 'CMA'
+                elif 'Price :' in cell:
+                    premium = cell.split(':')[1].strip()
                 elif 'Term Start :' in cell:
                     delivery_month_year = cell.split(':')[1].strip()
                     try:
@@ -83,30 +87,39 @@ def extract_data_modern_commodities(sheet):
 
         if transaction_date and transaction_type and seller and buyer and pipeline and city and trader \
             and quantityA and quantityB and broker and brokerDocID and pricingDetail and pricingType and paymentTerm and creditTerm \
-            and delivery_date_start and delivery_date_end and deliver_month:
+            and delivery_date_start and delivery_date_end:
             break
-    print(brokerDocID)
     if 'PetroChina International (America), Inc' in seller:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         seller = company
         buyer = buyer.upper()
         trader = get_name(sellerAttn)
+        team = 'Crude_AM'
+        quantityC = '±0%'
     elif 'PetroChina International (America), Inc' in buyer:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         buyer = company
         seller = seller.upper()
         trader = get_name(buyerAttn)
+        team = 'Crude_AM'
+        quantityC = '±0%'
     elif 'PETROCHINA INTERNATIONAL (CANADA), TRADING LTD' in seller:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         seller = company
         buyer = buyer.upper()
         trader = get_name(sellerAttn)
+        team = 'Crude_Canada'
+        quantityC = '±5%'
     elif 'PETROCHINA INTERNATIONAL (CANADA), TRADING LTD' in buyer:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         buyer = company
         seller = seller.upper()
         trader = get_name(buyerAttn)
+        team = 'Crude_Canada'
+        quantityC = '±5%'
     
+    if pricingType == 'CMA' and quantityB == 'BBL':
+        premium = str(premium) + ' USD/BBL'
     # Change city name from HOUSTON to Houston, except for ECHO which is recorded as ECHO
     if city == 'ECHO':
         city == city
@@ -121,7 +134,7 @@ def extract_data_modern_commodities(sheet):
         (physical_data_locations_df['booking'] == company)
     ]
     #print(f"Filtered data: \n{filtered_data}")
-    print(f"Data: \n{city, pipeline, 0, company}")
+    #print(f"Data: \n{city, pipeline, 0, company}")
 
     if not filtered_data.empty:
         matched_row = filtered_data.iloc[0]
@@ -147,5 +160,5 @@ def extract_data_modern_commodities(sheet):
             id_ = 'no corresponding pipeline implis no correct id'
             pipeline = 'pipeline not found, broker pipeline did not match in database'
 
-    return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, broker, brokerDocID, \
-        pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_ or ""
+    return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
+        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""

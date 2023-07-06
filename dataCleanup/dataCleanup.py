@@ -6,9 +6,18 @@ import shutil
 from shutil import copy2
 from openpyxl.utils import get_column_letter
 from openpyxl import Workbook
+from pdf2image import convert_from_path
+import pytesseract
+
 from LinkCrudeResourcesLLC import extract_data_link_crude
 from CirtronCommoditiesLLC import extract_data_citron_commodities
 from ModernCommoditiesINC import extract_data_modern_commodities
+from OneExchangeCorp import extract_data_one_exchange
+
+# Path for tesseract
+poppler_path = r"C:\Program Files\poppler-0.68.0_x86\poppler-0.68.0\bin"  # replace with your path
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+os.environ["PATH"] += os.pathsep + poppler_path
 
 # Define the names & locations of folders and format / data files
 BASE_DIR = os.getcwd()
@@ -63,6 +72,7 @@ broker_to_function_map = {
     "Broker Link Crude": extract_data_link_crude,
     "Broker Citron Commodities": extract_data_citron_commodities,
     "Broker Modern Commodities": extract_data_modern_commodities,
+    "Broker One Exchange": extract_data_one_exchange,
     # Add more broker and values here...
 }
 
@@ -78,6 +88,8 @@ def identify_broker(sheet):
                     return 'Broker Citron Commodities'
                 if 'Term Start : ' in cell:
                     return 'Broker Modern Commodities'
+                if 'ONE EXCHANGE' in cell:
+                    return 'Broker One Exchange'
     # If no broker found, return None
     return None
 
@@ -98,8 +110,8 @@ def extract_data(sheet, file_name):
 
 # Printing the data collected to the corresponding excel files, including constant data
 def update_sheet(sheet, data, filename):
-    transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, broker, brokerDocID, \
-    pricingDetail, pricingType, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_ = data
+    transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
+    pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency = data or ""
 
     sheet['B1'] = transaction_date or ""
     sheet['B3'] = transaction_type or ""
@@ -128,9 +140,9 @@ def update_sheet(sheet, data, filename):
 
     sheet['B10'] = quantityA or ""
     sheet['B11'] = quantityB or ""
-    sheet['B12'] = '±0%'
+    sheet['B12'] = quantityC or ""
     sheet['B13'] = 'FIP'
-    sheet['B15'] = 'Crude_AM'
+    sheet['B15'] = team
     sheet['B17'] = 'Pipeline'
     sheet['B18'] = location or ""  
     sheet['B19'] = pipeline or ""
@@ -142,14 +154,14 @@ def update_sheet(sheet, data, filename):
 
     sheet['B23'] = pricingType or ""
     sheet['B24'] = pricingDetail or ""
-    sheet['B25'] = paymentTerm or ""
-    sheet['B26'] = creditTerm or ""
+    sheet['B25'] = premium or ""
+    sheet['B26'] = paymentTerm or ""
+    sheet['B27'] = creditTerm or ""
     sheet['B28'] = 'N/A'
     sheet['B29'] = 'No Inspection Fee Associated'
     sheet['B30'] = '0'
-    sheet['B32'] = 'USD'
+    sheet['B32'] = currency
     sheet['B33'] = broker or ""
-    print(brokerDocID)
     sheet['B34'] = brokerDocID or ""
     sheet['B35'] = id_ or ""
     
@@ -211,8 +223,6 @@ def cleanup_data(target_dir):
         update_sheet(sheet2, data_dict, file)
         book.save(os.path.join(target_dir, file))
 
-
-
 # PDF Plumber that changes broker pdf to excel
 def extract_text_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
@@ -221,7 +231,30 @@ def extract_text_from_pdf(pdf_path):
             page_text = page.extract_text()
             for line in page_text.split('\n'):
                 text.append([line])  # wrap each line in a list to create a 2D list
+
+    if not text or all(line == [''] for line in text):
+        print('PdfPlumber Failed')
+        return None
+
     return text
+
+
+# Tesseract in case PDF Plumber fails
+def pdf_to_excel(pdf_file, output_file):
+    images = convert_from_path(pdf_file)
+    all_text = []
+    for i, image in enumerate(images):
+        #print(f"Processing page {i+1}...")
+        
+        image = image.convert('L')  # Improve image quality, convert image to grayscale
+        text = pytesseract.image_to_string(image, config='--oem 1 --psm 3')         # Extract text using OCR
+        #print(text)  # Print out the text
+        text = text.split('\n')
+        all_text.extend(text)
+    
+    df = pd.DataFrame(all_text, columns=["Text"])       # Create DataFrame
+    print(df.head())                                    # Check DataFrame
+    df.to_excel(output_file, index=False)               # Export to Excel
 
 # Helper function
 def write_to_excel(data, output_file):
@@ -240,6 +273,29 @@ def remove_all_files_from_directory(directory):
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
+def process_pdf_files(directory):
+    for file in os.listdir(directory):
+        if file.endswith('.pdf'):
+            pdf_path = os.path.join(directory, file)
+            output_file = os.path.join(DATA_DIR, file.replace('.pdf', '.xlsx'))
+            text = extract_text_from_pdf(pdf_path)                  # Try to extract text using pdfplumber
+            if text is None: 
+                print('PdfPlumber Failed, trying Tesseract')
+                pdf_to_excel(pdf_path, output_file)    # Try to extract text using tesseract
+            else: write_to_excel(text, output_file)                 # Write the extracted text to Excel
+                
+def process_xlsx_files(directory):
+    for file in os.listdir(directory):
+        if file.endswith('.xlsx'):
+            original_wb = load_workbook(os.path.join(directory, file))
+            for i, sheet in enumerate(original_wb.sheetnames, start=1):
+                wb = Workbook()
+                new_sheet = wb.active
+                for row in original_wb[sheet].iter_rows():
+                    new_sheet.append((cell.value for cell in row))
+                output_file = os.path.join(DATA_DIR, f"{file.replace('.xlsx', '')}_{i}.xlsx")
+                wb.save(output_file)
+
 # Main(), where all the functions are called and handles the command line
 # Simply run 'python dataCleanup.py'
 def main():
@@ -248,23 +304,9 @@ def main():
             os.makedirs(directory)
     remove_all_files_from_directory(DATA_DIR)
     remove_all_files_from_directory(RESULT_DIR)
-
-    for file in os.listdir(PDF_DIR):
-        if file.endswith('.pdf'):
-            pdf_path = os.path.join(PDF_DIR, file)
-            text = extract_text_from_pdf(pdf_path)
-
-            output_file = os.path.join(DATA_DIR, file.replace('.pdf', '.xlsx'))
-            write_to_excel(text, output_file)
-        elif file.endswith('.xlsx'):
-            original_wb = load_workbook(os.path.join(PDF_DIR, file))
-            for i, sheet in enumerate(original_wb.sheetnames, start=1):
-                wb = Workbook()
-                new_sheet = wb.active
-                for row in original_wb[sheet].iter_rows():
-                    new_sheet.append((cell.value for cell in row))
-                output_file = os.path.join(DATA_DIR, f"{file.replace('.xlsx', '')}_{i}.xlsx")
-                wb.save(output_file)
+    
+    process_pdf_files(PDF_DIR)
+    process_xlsx_files(PDF_DIR)
 
     cleanup_data(DATA_DIR)
     copy_files(DATA_DIR, RESULT_DIR)
