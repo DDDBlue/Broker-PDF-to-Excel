@@ -6,7 +6,7 @@ from pairings import get_name, get_pipeline
 def extract_data_citron_commodities(sheet):
     (transaction_date, transaction_type, seller, buyer, pipeline, trader, 
     quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, id_, company, team, currency) = ("",) * 26
+    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, location, id_, company, team, currency) = ("",) * 27
 
     petrochina_found = False
     broker = 'CITRON COMMODITIES LLC'
@@ -171,8 +171,11 @@ def extract_data_citron_commodities(sheet):
             state = matched_row['state']
             country = matched_row['country']
             location = f"{''.join(city)}, {''.join(state)}, {''.join(country)}"
-            id_ = 'no corresponding pipeline implis no correct id'
-            pipeline = 'pipeline not found, broker pipeline did not match in database'
+        if not location:
+            print(f"location not found, set to city which is {city}")
+            location = city
+        id_ = 'no corresponding pipeline implis no correct id'
+        pipeline = 'pipeline not found, broker pipeline did not match in database'
 
     return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
         pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""

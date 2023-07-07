@@ -88,7 +88,7 @@ def identify_broker(sheet):
                     return 'Broker Citron Commodities'
                 if 'Term Start : ' in cell:
                     return 'Broker Modern Commodities'
-                if 'ONE EXCHANGE' in cell:
+                if 'ONE EXCHANGE' or 'One Exchange' in cell:
                     return 'Broker One Exchange'
     # If no broker found, return None
     return None
@@ -297,7 +297,7 @@ def process_xlsx_files(directory):
                 wb.save(output_file)
 
 # Main(), where all the functions are called and handles the command line
-# Simply run 'python dataCleanup.py'
+# Simply run 'python dataCleanup.py' on terminal after having the dataCleanup folder open
 def main():
     for directory in [DATA_DIR, PDF_DIR, RESULT_DIR]:
         if not os.path.exists(directory):

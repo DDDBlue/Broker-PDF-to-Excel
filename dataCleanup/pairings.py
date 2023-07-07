@@ -21,6 +21,7 @@ def get_name(input_str):
         'Somename': 'jameshutchinson',
         'Somename': 'oscarmarrero',
         'Zhang Qing': 'zhangqing',
+        'David Velasquez': 'davidvelasquez'
         # Add more names and values here...
     }
 
@@ -35,6 +36,7 @@ def get_name(input_str):
 def get_pipeline(input_str):
     name_to_value = {
         'ENBRIDGE TERMINAL': 'Enbridge',
+        'NDPL': 'Enbridge North Dakota',
         'ENTERPRISE': 'Enterprise',
         'ZYDECO': 'HOHO',
         'LOCAP': 'LOOP Pipeline',
@@ -43,15 +45,20 @@ def get_pipeline(input_str):
         'LOOP': 'LOOP Pipeline',
         'Magellan/Houston': 'Magellan East houston',
         'Peace': 'Peace Pipeline',
-        # Add more names and values here...
-
-        # Canada Pipelines
         'AOSPL': 'Alberta Oil Sands Pipeline',
         'Pembina': 'Pembina Pipeline',
+        'Enb T@S': 'Enbridge Transfer At Source',
         'ETAS': 'Enbridge Transfer At Source',
+        'Transfer at Source': 'Enbridge Transfer At Source',
         'Gibson': 'Gibson T19',
         'GT19': 'Gibson T19',
         'Fort Sask': 'Fort Sask Pipeline',
+        'CLP-H': 'IPF Pipeline',
+        'Gibson Terminal': 'Gibson T19',
+        'Mustang': 'SAX',
+        'Market Link': 'Marketlink'
+
+        # Add more names and values here...
     }
 
     for name, value in name_to_value.items():

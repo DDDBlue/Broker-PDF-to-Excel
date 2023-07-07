@@ -6,7 +6,7 @@ from pairings import get_name, get_pipeline
 def extract_data_one_exchange(sheet):
     (transaction_date, transaction_type, seller, buyer, pipeline, trader, 
     quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, city, state, country, id_, company, team, currency) = ("",) * 25
+    creditTerm, delivery_date_start, delivery_date_end, city, state, location, country, id_, company, team, currency) = ("",) * 26
     broker = 'ONE EXCHANGE CORP.'
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
@@ -25,7 +25,13 @@ def extract_data_one_exchange(sheet):
                         trader = trader2
                     else: trader = trader1
                 elif 'Transportation:' in cell:
-                    pipeline = get_pipeline(cell.split(":")[1].strip())
+                    pipeline = cell.split(":")[1].strip()
+                    print(pipeline)
+                    if 'Crude' in cell:
+                        pipeline2 = pipeline.split('Crude')[0].strip()
+                        pipeline = pipeline2
+                        print(pipeline)
+                    pipeline = get_pipeline(pipeline)
                 elif 'Delivery Point:' in cell:
                     parts = cell.split(':')
                     city = parts[2].strip(" ")
@@ -75,6 +81,8 @@ def extract_data_one_exchange(sheet):
                     pricingType = 'Complex'
                     pricingDetail = '-'
                     premium = ''
+                elif 'Gibson Terminal' in cell:
+                    pipeline = 'Gibson T19'
 
         if transaction_date and transaction_type and seller and buyer and pipeline and city and trader \
             and quantityA and quantityB and broker and brokerDocID and pricingDetail and pricingType and paymentTerm and creditTerm \
@@ -120,7 +128,7 @@ def extract_data_one_exchange(sheet):
         (physical_data_locations_df['booking'] == company)
     ]
     #print(f"Filtered data: \n{filtered_data}")
-    #print(f"Data: \n{city, pipeline, 0, company}")
+    print(f"Data: \n{city, pipeline, 0, company}")
 
     if not filtered_data.empty:
         matched_row = filtered_data.iloc[0]
@@ -142,7 +150,10 @@ def extract_data_one_exchange(sheet):
             state = matched_row['state']
             country = matched_row['country']
             location = f"{''.join(city)}, {''.join(state)}, {''.join(country)}"
-            id_ = 'no corresponding pipeline implis no correct id'
-            pipeline = 'pipeline not found, broker pipeline did not match in database'
+        if not location:
+            print(f"location not found, set to city which is {city}")
+            location = city
+        id_ = 'no corresponding pipeline implis no correct id'
+        pipeline = 'pipeline not found, broker pipeline did not match in database'
     return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
         pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""
