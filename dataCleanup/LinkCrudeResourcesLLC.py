@@ -4,12 +4,13 @@ from datetime import datetime, timedelta
 from pairings import get_name, get_pipeline
 
 def extract_data_link_crude(sheet):
-    (transaction_date, transaction_type, seller, buyer, pipeline, buyerAttn, sellerAttn, trader, 
+    (transaction_date, transaction_type, seller, buyer, pipeline, buyerAttn, sellerAttn, trader, deliveryTerm, 
     quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, location, id_, company, team, currency) = ("",) * 29
+    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, location, id_, company, team, currency) = ("",) * 30
                     
     broker = 'LINK CRUDE RESOURCES,LLC'
     currency = 'USD'
+    deliveryTerm = 'FIP'
 
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
@@ -80,7 +81,7 @@ def extract_data_link_crude(sheet):
                 elif 'Transaction #:' in cell:
                     brokerDocID = cell.split(':')[1].strip()
 
-        if transaction_date and transaction_type and seller and buyer and pipeline and city and trader \
+        if transaction_date and transaction_type and seller and buyer and pipeline and city and trader and deliveryTerm \
             and quantityA and quantityB and broker and brokerDocID and pricingDetail and pricingType and paymentTerm and creditTerm \
             and delivery_date_start and delivery_date_end and deliver_month:
             break
@@ -156,4 +157,4 @@ def extract_data_link_crude(sheet):
         pipeline = 'pipeline not found, broker pipeline did not match in database'
 
     return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
-        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""
+        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency, deliveryTerm or ""

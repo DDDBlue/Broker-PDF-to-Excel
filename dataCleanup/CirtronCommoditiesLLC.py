@@ -4,14 +4,15 @@ from datetime import datetime, timedelta
 from pairings import get_name, get_pipeline
 
 def extract_data_citron_commodities(sheet):
-    (transaction_date, transaction_type, seller, buyer, pipeline, trader, 
+    (transaction_date, transaction_type, seller, buyer, pipeline, trader, deliveryTerm, 
     quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
-    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, location, id_, company, team, currency) = ("",) * 27
+    creditTerm, delivery_date_start, delivery_date_end, deliver_month, city, state, country, location, id_, company, team, currency) = ("",) * 28
 
     petrochina_found = False
     broker = 'CITRON COMMODITIES LLC'
     paymentTerm = '20 days after delivery month-end'
     currency = 'USD'
+    deliveryTerm = 'FIP'
 
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
@@ -178,4 +179,4 @@ def extract_data_citron_commodities(sheet):
         pipeline = 'pipeline not found, broker pipeline did not match in database'
 
     return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
-        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""
+        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency, deliveryTerm or ""

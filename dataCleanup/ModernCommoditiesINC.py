@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from pairings import get_name, get_pipeline, get_city
 
 def extract_data_modern_commodities(sheet):
-    (transaction_date, transaction_type, seller, buyer, pipeline, buyerAttn, sellerAttn, trader, 
+    (transaction_date, transaction_type, seller, buyer, pipeline, buyerAttn, sellerAttn, trader, deliveryTerm, 
     quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
     creditTerm, delivery_date_start, delivery_date_end, city, state, location, country, id_, company, team, currency) = ("",) * 29
                     
@@ -13,6 +13,7 @@ def extract_data_modern_commodities(sheet):
     creditTerm = 'Seller\'s discretion'
     pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE'
     currency = 'USD'
+    deliveryTerm = 'FIP'
 
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
@@ -164,4 +165,4 @@ def extract_data_modern_commodities(sheet):
         pipeline = 'pipeline not found, broker pipeline did not match in database'
 
     return transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
-        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency or ""
+        pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency, deliveryTerm or ""

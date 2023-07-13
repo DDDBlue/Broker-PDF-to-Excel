@@ -21,7 +21,8 @@ def get_name(input_str):
         'Somename': 'jameshutchinson',
         'Somename': 'oscarmarrero',
         'Zhang Qing': 'zhangqing',
-        'David Velasquez': 'davidvelasquez'
+        'David Velasquez': 'davidvelasquez',
+        'Justin Amoah': 'justinamoah'
         # Add more names and values here...
     }
 
@@ -50,13 +51,19 @@ def get_pipeline(input_str):
         'Enb T@S': 'Enbridge Transfer At Source',
         'ETAS': 'Enbridge Transfer At Source',
         'Transfer at Source': 'Enbridge Transfer At Source',
+        'Enbridge Transfer': 'Enbridge Transfer At Source',
         'Gibson': 'Gibson T19',
         'GT19': 'Gibson T19',
         'Fort Sask': 'Fort Sask Pipeline',
         'CLP-H': 'IPF Pipeline',
+        'Cold Lake': 'IPF Pipeline',
         'Gibson Terminal': 'Gibson T19',
         'Mustang': 'SAX',
-        'Market Link': 'Marketlink'
+        'Market Link': 'Marketlink',
+        'Federated': 'Swan Hills Pipeline',
+        'Dakota Access Pipeline': 'DAPL',
+        'Guernsey Hub': 'Guernsey HUB',
+        'Guernsey': 'Guernsey HUB'
 
         # Add more names and values here...
     }

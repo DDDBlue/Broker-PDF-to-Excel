@@ -8,11 +8,15 @@ from openpyxl.utils import get_column_letter
 from openpyxl import Workbook
 from pdf2image import convert_from_path
 import pytesseract
+from extract_msg import Message
+from PyPDF2 import PdfReader, PdfWriter, PdfFileWriter
 
 from LinkCrudeResourcesLLC import extract_data_link_crude
 from CirtronCommoditiesLLC import extract_data_citron_commodities
 from ModernCommoditiesINC import extract_data_modern_commodities
 from OneExchangeCorp import extract_data_one_exchange
+from CalRockBrokersINC import extract_data_calrock_brokers
+from SyntexEnergyLLC import extract_data_syntex_energy
 
 # Path for tesseract
 poppler_path = r"C:\Program Files\poppler-0.68.0_x86\poppler-0.68.0\bin"  # replace with your path
@@ -71,8 +75,10 @@ def load_files(directory, extension=None):
 broker_to_function_map = {
     "Broker Link Crude": extract_data_link_crude,
     "Broker Citron Commodities": extract_data_citron_commodities,
+    "Broker CalRock Brokers": extract_data_calrock_brokers,
     "Broker Modern Commodities": extract_data_modern_commodities,
     "Broker One Exchange": extract_data_one_exchange,
+    "Broker Syntex Energy": extract_data_syntex_energy,
     # Add more broker and values here...
 }
 
@@ -81,16 +87,30 @@ def identify_broker(sheet):
         for cell in row:
             if isinstance(cell, str):
                 if 'LINK CRUDE RESOURCES, LLC' in cell:
-                    #print("found Broker Link Crude")
+                    print("found Broker Link Crude")
                     return 'Broker Link Crude'
                 if 'None None' in cell:
-                    #print("found Broker Citron Commodities")
+                    print("found Broker Citron Commodities")
                     return 'Broker Citron Commodities'
-                if 'Term Start : ' in cell:
+                if 'CalRock Brokers Inc.' in cell:
+                    print("found Broker CalRock Brokers")
+                    return 'Broker CalRock Brokers'
+                if 'Click & Trade' in cell:
+                    print("found Broker Modern Commodities")
                     return 'Broker Modern Commodities'
-                if 'ONE EXCHANGE' or 'One Exchange' in cell:
+                if 'ONE EXCHANGE' in cell:
+                    print("found Broker One Exchange")
                     return 'Broker One Exchange'
+                if 'One Exchange' in cell:
+                    print("found Broker One Exchange")
+                    return 'Broker One Exchange'
+                if 'SYNTEXENERGY' in cell:
+                    return 'Broker Syntex Energy'
+                if 'Syntex Energy' in cell:
+                    return 'Broker Syntex Energy'
+
     # If no broker found, return None
+    print("Broker not found")
     return None
 
 def extract_data(sheet, file_name):
@@ -111,7 +131,7 @@ def extract_data(sheet, file_name):
 # Printing the data collected to the corresponding excel files, including constant data
 def update_sheet(sheet, data, filename):
     transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
-    pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency = data or ""
+    pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency, deliveryTerm = data or ""
 
     sheet['B1'] = transaction_date or ""
     sheet['B3'] = transaction_type or ""
@@ -141,7 +161,7 @@ def update_sheet(sheet, data, filename):
     sheet['B10'] = quantityA or ""
     sheet['B11'] = quantityB or ""
     sheet['B12'] = quantityC or ""
-    sheet['B13'] = 'FIP'
+    sheet['B13'] = deliveryTerm
     sheet['B15'] = team
     sheet['B17'] = 'Pipeline'
     sheet['B18'] = location or ""  
@@ -223,6 +243,25 @@ def cleanup_data(target_dir):
         update_sheet(sheet2, data_dict, file)
         book.save(os.path.join(target_dir, file))
 
+# If the pdf has two pages, split them (its usally a buy-trade so they're put together, but they are recorded seperately)
+def split_pdf_pages(directory):
+    for file in os.listdir(directory):
+        if file.endswith('.pdf'):
+            pdf_path = os.path.join(directory, file)
+            #print(f"Processing: {file}")
+            pdf = PdfReader(pdf_path)
+
+            if len(pdf.pages) >= 2:
+                for i, page in enumerate(pdf.pages, start=1):
+                    writer = PdfWriter()
+                    writer.add_page(page)
+                    output_file = os.path.join(directory, f"{file.replace('.pdf', '')}_{i}.pdf")
+                    writer.write(output_file)
+                    print(f"Created: {output_file}")
+                os.remove(pdf_path)
+                print(f"Deleted original file: {file}")
+
+
 # PDF Plumber that changes broker pdf to excel
 def extract_text_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
@@ -253,7 +292,7 @@ def pdf_to_excel(pdf_file, output_file):
         all_text.extend(text)
     
     df = pd.DataFrame(all_text, columns=["Text"])       # Create DataFrame
-    print(df.head())                                    # Check DataFrame
+    #print(df.head())                                    # Check DataFrame
     df.to_excel(output_file, index=False)               # Export to Excel
 
 # Helper function
@@ -273,6 +312,7 @@ def remove_all_files_from_directory(directory):
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
+# Fuction to process pdf files
 def process_pdf_files(directory):
     for file in os.listdir(directory):
         if file.endswith('.pdf'):
@@ -283,7 +323,8 @@ def process_pdf_files(directory):
                 print('PdfPlumber Failed, trying Tesseract')
                 pdf_to_excel(pdf_path, output_file)    # Try to extract text using tesseract
             else: write_to_excel(text, output_file)                 # Write the extracted text to Excel
-                
+
+# Function to process excel files
 def process_xlsx_files(directory):
     for file in os.listdir(directory):
         if file.endswith('.xlsx'):
@@ -296,6 +337,35 @@ def process_xlsx_files(directory):
                 output_file = os.path.join(DATA_DIR, f"{file.replace('.xlsx', '')}_{i}.xlsx")
                 wb.save(output_file)
 
+# Helper function to process msg files
+def convert_msg_to_excel(msg_file_path):
+    msg = Message(msg_file_path)
+    msg_content = msg.body
+
+    # Split the message into lines and remove excess whitespace
+    msg_lines = msg_content.split('\n')
+    cleaned_msg_lines = [' '.join(line.split()) for line in msg_lines]
+
+    return cleaned_msg_lines
+
+# Function to process msg files
+def process_msg_files(directory):
+    for file in os.listdir(directory):
+        if file.endswith('.msg'):
+            msg_file_path = os.path.join(directory, file)
+            msg_lines = convert_msg_to_excel(msg_file_path)
+            
+            # Create a list to store message lines and remove excess spaces
+            message_lines = [' '.join(line.split()) for line in msg_lines]
+
+            # Create a DataFrame from the list
+            df = pd.DataFrame({'Message Line': message_lines})
+
+            # Write the DataFrame to an Excel file
+            output_file = os.path.join(DATA_DIR, file.replace('.msg', '.xlsx'))
+            df.to_excel(output_file, index=False)
+
+
 # Main(), where all the functions are called and handles the command line
 # Simply run 'python dataCleanup.py' on terminal after having the dataCleanup folder open
 def main():
@@ -305,8 +375,10 @@ def main():
     remove_all_files_from_directory(DATA_DIR)
     remove_all_files_from_directory(RESULT_DIR)
     
+    split_pdf_pages(PDF_DIR)
     process_pdf_files(PDF_DIR)
     process_xlsx_files(PDF_DIR)
+    process_msg_files(PDF_DIR)
 
     cleanup_data(DATA_DIR)
     copy_files(DATA_DIR, RESULT_DIR)
