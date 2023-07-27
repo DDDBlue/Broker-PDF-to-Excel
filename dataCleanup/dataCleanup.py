@@ -17,6 +17,7 @@ from ModernCommoditiesINC import extract_data_modern_commodities
 from OneExchangeCorp import extract_data_one_exchange
 from CalRockBrokersINC import extract_data_calrock_brokers
 from SyntexEnergyLLC import extract_data_syntex_energy
+from MarexSpectron import extract_data_marex_spectron
 
 # Path for tesseract
 poppler_path = r"C:\Program Files\poppler-0.68.0_x86\poppler-0.68.0\bin"  # replace with your path
@@ -79,6 +80,7 @@ broker_to_function_map = {
     "Broker Modern Commodities": extract_data_modern_commodities,
     "Broker One Exchange": extract_data_one_exchange,
     "Broker Syntex Energy": extract_data_syntex_energy,
+    "Broker Marex Spectron": extract_data_marex_spectron,
     # Add more broker and values here...
 }
 
@@ -108,6 +110,8 @@ def identify_broker(sheet):
                     return 'Broker Syntex Energy'
                 if 'Syntex Energy' in cell:
                     return 'Broker Syntex Energy'
+                if 'Marex' in cell:
+                    return 'Broker Marex Spectron'
 
     # If no broker found, return None
     print("Broker not found")
@@ -150,13 +154,12 @@ def update_sheet(sheet, data, filename):
         sheet['B5'] = buyer
         sheet['B14'] = trader or ""
         quantityA = -1 * (quantityA or 0)
-
     try:
         sheet['B8'] = (delivery_date_start.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/") if delivery_date_start else "")
         sheet['B9'] = (delivery_date_end.strftime('%m/%d/%Y').lstrip("0").replace("/0", "/") if delivery_date_end else "")
     except AttributeError:
-        sheet['B8'] = ""
-        sheet['B9'] = ""
+        sheet['B8'] = delivery_date_start
+        sheet['B9'] = delivery_date_end
 
     sheet['B10'] = quantityA or ""
     sheet['B11'] = quantityB or ""
@@ -170,7 +173,8 @@ def update_sheet(sheet, data, filename):
     try:
         sheet['B22'] = (delivery_date_start.strftime('%Y-%m-%d') if delivery_date_start else "")
     except AttributeError:
-        sheet['B22'] = ""
+        print(delivery_date_start)
+        sheet['B22'] = ''
 
     sheet['B23'] = pricingType or ""
     sheet['B24'] = pricingDetail or ""
@@ -187,7 +191,7 @@ def update_sheet(sheet, data, filename):
     
     if not sheet['B14'].value:
         recognization[filename] = False
-    if not sheet['B35'].value:
+    if sheet['B35'].value == 'no corresponding pipeline implis no correct id':
         recognization[filename] = False
 
 

@@ -3,59 +3,70 @@ import re
 from datetime import datetime, timedelta
 from pairings import get_name, get_pipeline
 
-def extract_data_calrock_brokers(sheet):
+def extract_data_marex_spectron(sheet):
     (transaction_date, transaction_type, seller, buyer, pipeline, trader, sellerAttn, buyerAttn, deliveryTerm, 
     quantityA, quantityB, quantityC, broker, brokerDocID, pricingDetail, pricingType, premium, paymentTerm, 
     creditTerm, delivery_date_start, delivery_date_end, city, state, location, country, id_, company, team, currency) = ("",) * 29
-    broker = 'CALROCK BROKERS INC.'
-    deliveryTerm = 'EXPIPE'
+    broker = 'MAREX SPECTRON INTERNATIONAL LIMITED'
+    currency = 'USD'
+    creditTerm = 'Seller\'s discretion'
+
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
             if isinstance(cell, str):
-                if 'Trade Time' in cell:
-                    transaction_date = ' '.join(cell.split(':')[1].strip().split(' ')[:3])
-                elif 'Buyer Company :' in cell:
-                    buyer = cell.split(':')[1].strip()
-                elif 'Seller Company :' in cell:
-                    seller = cell.split(':')[1].strip()
-                elif 'Seller Trader' in cell:
-                    sellerAttn = get_name(cell.split(':')[1].strip())
-                elif 'Buyer Trader' in cell:
-                    buyerAttn = get_name(cell.split(':')[1].strip())
-                elif 'Hub' in cell:
-                    parts = cell.split(':')[1].strip()
-                    pipeline = parts.split('-')[1].strip()
-                    print(pipeline)
-                    pipeline = get_pipeline(pipeline)
-                    print(pipeline)
-                    city = parts.split('-')[0].strip()
-                elif 'Volume :' in cell:
-                    quantityA = cell.split(':')[1].strip()
-                    quantityA = quantityA.split(' ')[0].strip()
-                    quantityA = int (quantityA)
-                elif 'Term Start' in cell:
-                    delivery_month_year = cell.split(':')[1].strip()
+                if 'Marex Reference' in cell:
+                    brokerDocID = cell.split('Reference ')[1].strip()
+                if 'Deal Date' in cell:
+                    transaction_date = cell.split('Deal Date ')[1].strip()
                     try:
-                        # Adjust the format to match 'August 01, 2023'
-                        delivery_date_start = datetime.strptime(delivery_month_year, '%B %d, %Y')
+                        datetime_obj = datetime.strptime(transaction_date, "%d-%b-%y %H:%M:%S")
+                    except ValueError:
+                        pass
+                    transaction_date = datetime_obj.strftime("%m/%d/%Y")
+                elif 'Buyer ' in cell:
+                    buyer = cell.split('Buyer ')[1].strip()
+                elif 'Seller ' in cell:
+                    seller = cell.split('Seller ')[1].strip()
+                elif 'Sell Trader' in cell:
+                    sellerAttn = cell.split('Trader ')[1]
+                elif 'Buy Trader' in cell:
+                    buyerAttn = cell.split('Trader ')[1]
+                elif 'Location' in cell:
+                    city = cell.split('Location ')[1].strip()
+                elif 'Pipeline' in cell:
+                    pipeline = cell.split('Pipeline ')[1].strip()
+                    pipeline = get_pipeline(pipeline)
+                elif 'Total Volume' in cell:
+                    quantityA = quantityA
+                elif 'Volume' in cell:
+                    quantityA = cell.split(' ')[1].strip()
+                    quantityA = quantityA.replace('m3','')
+                    quantityA = quantityA.replace(',','')
+                    quantityA = int (quantityA)
+                elif 'Contract Issuer' in cell:
+                    print(delivery_date_start, delivery_date_end)
+                elif 'Contract' in cell:
+                    delivery_month_year = cell.split('Contract ')[1]
+                    try:
+                        delivery_date_start = datetime.strptime(delivery_month_year, '%b-%y')
                     except ValueError:
                         print("The date format is incorrect.")
                         return
+
                     delivery_date_end = datetime(delivery_date_start.year, delivery_date_start.month, 1) + timedelta(days=32)
                     delivery_date_end = delivery_date_end.replace(day=1) - timedelta(days=1)
+    
+                    
                 elif 'Trade ID' in cell:
                     brokerDocID = cell.split(':')[1].strip()
                 elif 'Price' in cell:
-                    if 'USD' in cell:
-                        currency = 'USD'
-                    elif 'CAD' in cell:
-                        currency = 'CAD'
-                    premium = cell.split(':')[1].strip()
-                    premium = premium + ' USD/BBL'
-                elif 'Index' in cell:
-                    if 'CMA' in cell: 
-                        pricingType = 'CMA'
-                        pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE ' + premium
+                    pricingType = 'Fixed'
+                    pricingDetail = cell.split('Price')[1].strip()
+                    pricingDetail = pricingDetail.split(' ')[0].strip()
+                    premium = pricingDetail
+                elif 'CMA' in cell:
+                    pricingType = 'CMA'
+                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE ' + premium
                 elif 'Calendar Month Average' in cell:
                     pricingType = 'Complex'
                     pricingDetail = '-'
@@ -70,41 +81,51 @@ def extract_data_calrock_brokers(sheet):
         city == city
     elif city == 'Houston':
         city = 'East Houston'
+    elif city == 'Johnson\'s Corner':
+        city = 'Johnsons Corner'
+    elif city == 'Johnson\'S Corner':
+        city = 'Johnsons Corner'
     else: city = city.title()
-
-    if 'PetroChina International (America), Inc.' in seller:
+    if 'PetroChina International (America) Inc.' in seller:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         seller = company
         buyer = buyer.upper()
-        trader = sellerAttn
+        trader = get_name(sellerAttn)
         team = 'Crude_AM'
         quantityB = 'BBL'
         quantityC = '±0%'
-    elif 'PetroChina International (America), Inc.' == buyer:
+        deliveryTerm = 'FIP'
+        paymentTerm = '20 days after delivery month-end'
+    elif 'PetroChina International (America) Inc.' in buyer:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         buyer = company
         seller = seller.upper()
-        trader = buyerAttn
+        trader = get_name(buyerAttn)
         team = 'Crude_AM'
         quantityB = 'BBL'
         quantityC = '±0%'
+        deliveryTerm = 'FIP'
+        paymentTerm = '20 days after delivery month-end'
     elif 'PetroChina International (Canada) Trading Ltd.' in seller:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         seller = company
         buyer = buyer.upper()
-        trader = sellerAttn
+        trader = get_name(sellerAttn)
         team = 'Crude_Canada'
         quantityB = 'M3'
         quantityC = '±5%'
+        deliveryTerm = 'EXPIPE'
+        paymentTerm = '25 days after delivery month-end'
     elif 'PetroChina International (Canada) Trading Ltd.' in buyer:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         buyer = company
         seller = seller.upper()
-        trader = buyerAttn
+        trader = get_name(buyerAttn)
         team = 'Crude_Canada'
         quantityB = 'M3'
         quantityC = '±5%'
-
+        deliveryTerm = 'EXPIPE'
+        paymentTerm = '25 days after delivery month-end'
     physical_data_locations_df = pd.read_excel('physical_data_locations.xlsx')
     # Filter the data based on city, pipeline and status
     filtered_data = physical_data_locations_df[

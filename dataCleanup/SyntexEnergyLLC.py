@@ -9,49 +9,95 @@ def extract_data_syntex_energy(sheet):
     creditTerm, delivery_date_start, delivery_date_end, city, state, location, country, id_, company, team, currency) = ("",) * 29
     broker = 'SYNTEXENERGY LLC'
     deliveryTerm = 'EXPIPE'
+    currency = 'USD'
+    creditTerm = 'Seller\'s discretion'
+    paymentTerm = '20 days after delivery month-end'
+
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
             if isinstance(cell, str):
-                if 'Trade Time' in cell:
-                    transaction_date = ' '.join(cell.split(':')[1].strip().split(' ')[:3])
-                elif 'Buyer Company :' in cell:
-                    buyer = cell.split(':')[1].strip()
-                elif 'Seller Company :' in cell:
-                    seller = cell.split(':')[1].strip()
-                elif 'Seller Trader' in cell:
-                    sellerAttn = get_name(cell.split(':')[1].strip())
-                elif 'Buyer Trader' in cell:
-                    buyerAttn = get_name(cell.split(':')[1].strip())
-                elif 'Hub' in cell:
-                    parts = cell.split(':')[1].strip()
-                    pipeline = parts.split('-')[1].strip()
-                    print(pipeline)
-                    pipeline = get_pipeline(pipeline)
-                    print(pipeline)
-                    city = parts.split('-')[0].strip()
-                elif 'Volume :' in cell:
+                if 'Closed On Date:' in cell:
+                    transaction_date = cell.split(':')[1].strip()
+                    transaction_date = transaction_date.replace('— ','')
+                    transaction_date = transaction_date.replace('—','')
+                    try: 
+                        datetime_obj = datetime.strptime(transaction_date, "%B %d, %Y")
+                    except ValueError:
+                        datetime_obj = datetime.strptime(transaction_date, "%B %d,%Y")
+                    transaction_date = datetime_obj.strftime("%m/%d/%Y")
+                elif '(Buyer) Agrees' in cell:
+                    buyer = cell.split('(B')[0].strip()
+                elif '(Seller) Agrees' in cell:
+                    seller = cell.split('(S')[0].strip()
+                elif 'Attn: ' in cell:
+                    parts = cell.split("Attn: ")
+                    trader1 = get_name(parts[1].strip(''))
+                    trader2 = get_name(parts[2].strip(''))
+                    if trader1 == 'Un-identified Trader':
+                        trader = trader2
+                    else: trader = trader1
+                elif 'Location:' in cell:
+                    parts = cell.split('At')[1].strip()
+                    if parts[0] == ',':
+                        city = parts.split(',')[1].strip()
+                    else:
+                        city = parts.split(',')[0].strip()
+                    if 'Zydeco' in cell:
+                        pipeline = 'ZYDECO'
+                        pipeline = get_pipeline(pipeline)
+                    if 'Enterprise' in cell:
+                        pipeline = 'Enterprise'
+                        pipeline = get_pipeline(pipeline)
+                    if 'Loop' in cell:
+                        pipeline = 'LOOP'
+                        pipeline = get_pipeline(pipeline)
+                elif 'Volume:' in cell:
                     quantityA = cell.split(':')[1].strip()
+                    quantityA = quantityA.replace('‘','')
+                    quantityA = quantityA.replace('—','')
+                    quantityA = quantityA.replace(',','')
                     quantityA = quantityA.split(' ')[0].strip()
                     quantityA = int (quantityA)
-                elif 'Term Start' in cell:
+                elif 'Term:' in cell:
                     delivery_month_year = cell.split(':')[1].strip()
+                    delivery_month_year = delivery_month_year.split('Through')[0].strip()
+                    print(delivery_month_year)
                     try:
-                        # Adjust the format to match 'August 01, 2023'
-                        delivery_date_start = datetime.strptime(delivery_month_year, '%B %d, %Y')
+                        try:
+                            delivery_date_start = datetime.strptime(delivery_month_year, '%B %d, %Y')
+                        except ValueError:
+                              delivery_date_start = datetime.strptime(delivery_month_year,'%B %d,%Y')
                     except ValueError:
                         print("The date format is incorrect.")
                         return
                     delivery_date_end = datetime(delivery_date_start.year, delivery_date_start.month, 1) + timedelta(days=32)
                     delivery_date_end = delivery_date_end.replace(day=1) - timedelta(days=1)
+                    
+                    if delivery_date_start.month == 12:
+                        next_month_first_day = delivery_date_start.replace(year=delivery_date_start.year+1, month=1, day=1)
+                    else:
+                        next_month_first_day = delivery_date_start.replace(month=delivery_date_start.month+1, day=1)
+
+                   # Number of days in current month
+                    number_of_days = (next_month_first_day - delivery_date_start).days
                 elif 'Trade ID' in cell:
                     brokerDocID = cell.split(':')[1].strip()
-                elif 'Price' in cell:
-                    if 'USD' in cell:
-                        currency = 'USD'
-                    elif 'CAD' in cell:
-                        currency = 'CAD'
-                    premium = cell.split(':')[1].strip()
+                elif 'Per Barrel (' in cell:
+                    premium = cell.split('$')[1].strip()
+                    premium = premium.split(' ')[0].strip()
+                    if 'Plus' in cell:
+                        premium = '+' + premium
+                    else:
+                        premium = '-' + premium
                     premium = premium + ' USD/BBL'
+                    pricingType = 'CMA'
+                    pricingDetail = 'Wti/EXCHANGE/NYMEX/1ST NRBY/CLOSE ' + premium
+                    quantityA = quantityA * number_of_days
+
+                elif 'Price:' in cell:
+                    pricingType = 'Fixed'
+                    pricingDetail = cell.split(':')[1].strip()
+                    pricingDetail = pricingDetail.split(' ')[0].strip()
                 elif 'Index' in cell:
                     if 'CMA' in cell: 
                         pricingType = 'CMA'
@@ -72,35 +118,31 @@ def extract_data_syntex_energy(sheet):
         city = 'East Houston'
     else: city = city.title()
 
-    if 'PetroChina International (America), Inc.' in seller:
+    if 'Petrochina International America, Inc.' in seller:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         seller = company
         buyer = buyer.upper()
-        trader = sellerAttn
         team = 'Crude_AM'
         quantityB = 'BBL'
         quantityC = '±0%'
-    elif 'PetroChina International (America), Inc.' == buyer:
+    elif 'Petrochina International America, Inc.' == buyer:
         company = 'PETROCHINA INTERNATIONAL (AMERICA), INC.'
         buyer = company
         seller = seller.upper()
-        trader = buyerAttn
         team = 'Crude_AM'
         quantityB = 'BBL'
         quantityC = '±0%'
-    elif 'PetroChina International (Canada) Trading Ltd.' in seller:
+    elif 'Petrochina International Canada Trading Ltd.' in seller:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         seller = company
         buyer = buyer.upper()
-        trader = sellerAttn
         team = 'Crude_Canada'
         quantityB = 'M3'
         quantityC = '±5%'
-    elif 'PetroChina International (Canada) Trading Ltd.' in buyer:
+    elif 'Petrochina International Canada Trading Ltd.' in buyer:
         company = 'PETROCHINA INTERNATIONAL (CANADA) TRADING LTD.'
         buyer = company
         seller = seller.upper()
-        trader = buyerAttn
         team = 'Crude_Canada'
         quantityB = 'M3'
         quantityC = '±5%'
