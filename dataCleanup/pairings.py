@@ -11,15 +11,15 @@ def get_name(input_str):
         'Nicholas Bugos': 'nicholasbugos',
         'Dan Dubeck': 'danieldubeck',
         'Daniel Dubeck': 'danieldubeck',
-        'Somename': 'pennychin',
-        'Somename': 'justintodd',
-        'Somename': 'quynhtran',
-        'Somename': 'jjchen',
+        'Penny Chin': 'pennychin',
+        'Justin Todd': 'justintodd',
+        'Quynh Tran': 'quynhtran',
+        'JJ Chen': 'jjchen',
         'Yuri Dashko': 'yuridashko',
         'Ryan Lowey': 'ryanlowey',
         'Bryce Sturdy': 'brycesturdy',
-        'Somename': 'jameshutchinson',
-        'Somename': 'oscarmarrero',
+        'James Hutchinson': 'jameshutchinson',
+        'Oscar Marrero': 'oscarmarrero',
         'Zhang Qing': 'zhangqing',
         'David Velasquez': 'davidvelasquez',
         'Justin Amoah': 'justinamoah'
@@ -39,12 +39,15 @@ def get_pipeline(input_str):
         'ENBRIDGE TERMINAL': 'Enbridge',
         'NDPL': 'Enbridge North Dakota',
         'ENTERPRISE': 'Enterprise',
+        'Enterprise Pipeline': 'Enterprise',
         'ZYDECO': 'HOHO',
         'LOCAP': 'LOOP Pipeline',
+        'Loop': 'LOOP Pipeline',
         'MAGELLAN': 'Magellan East houston',
         'SEAWAY': 'Seaway',
         'LOOP': 'LOOP Pipeline',
         'Magellan/Houston': 'Magellan East houston',
+        'Magellan Terminal': 'Magellan East houston',
         'Peace': 'Peace Pipeline',
         'AOSPL': 'Alberta Oil Sands Pipeline',
         'Pembina': 'Pembina Pipeline',
@@ -65,7 +68,9 @@ def get_pipeline(input_str):
         'Federated': 'Swan Hills Pipeline',
         'Dakota Access Pipeline': 'DAPL',
         'Guernsey Hub': 'Guernsey HUB',
-        'Guernsey': 'Guernsey HUB'
+        'Guernsey': 'Guernsey HUB',
+        'Colonial Pipeline-Non Alabama Origin': 'Colonial',
+        'Colonial Pipeline': 'Colonial',
 
         # Add more names and values here...
     }
@@ -80,6 +85,8 @@ def get_pipeline(input_str):
 def get_city(input_str):
     name_to_value = {
         'JOCO': 'Johnsons Corner',
+        'Basis Linden': 'Linden',
+        'Magellan East Houston': 'East Houston',
         # Add more names and values here...
     }
 
@@ -87,3 +94,11 @@ def get_city(input_str):
         if name in input_str:
             return value
     return input_str
+
+def month_to_num(month):
+    month_dict = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 
+        'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 
+        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    }
+    return month_dict.get(month, 'Invalid month')

@@ -11,6 +11,7 @@ import pytesseract
 from extract_msg import Message
 from PyPDF2 import PdfReader, PdfWriter, PdfFileWriter
 
+# Import the individual datamining method from each broker file
 from LinkCrudeResourcesLLC import extract_data_link_crude
 from CirtronCommoditiesLLC import extract_data_citron_commodities
 from ModernCommoditiesINC import extract_data_modern_commodities
@@ -18,8 +19,16 @@ from OneExchangeCorp import extract_data_one_exchange
 from CalRockBrokersINC import extract_data_calrock_brokers
 from SyntexEnergyLLC import extract_data_syntex_energy
 from MarexSpectron import extract_data_marex_spectron
+from TPICAP import extract_data_tp_icap
+from SageRefinedProducts import extract_data_sage_refined
+from AxisBrokerageLP import extract_data_axis_brokerage
+from PVMPetroleumMarketsLLC import extract_data_pvm_petroleum
 
 # Path for tesseract
+# This is the pdf -> excel for brokers like One Exchange
+# Tesseract download -> https://github.com/UB-Mannheim/tesseract/wiki
+# Proppler download -> https://github.com/oschwartz10612/poppler-windows/releases
+
 poppler_path = r"C:\Program Files\poppler-0.68.0_x86\poppler-0.68.0\bin"  # replace with your path
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 os.environ["PATH"] += os.pathsep + poppler_path
@@ -72,7 +81,7 @@ def load_files(directory, extension=None):
     else:
         return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-
+# Helper function connecting functions
 broker_to_function_map = {
     "Broker Link Crude": extract_data_link_crude,
     "Broker Citron Commodities": extract_data_citron_commodities,
@@ -81,30 +90,35 @@ broker_to_function_map = {
     "Broker One Exchange": extract_data_one_exchange,
     "Broker Syntex Energy": extract_data_syntex_energy,
     "Broker Marex Spectron": extract_data_marex_spectron,
+    "Broker TP ICAP": extract_data_tp_icap,
+    "Broker Sage Refined": extract_data_sage_refined,
+    "Broker Axis Brokerage": extract_data_axis_brokerage,
+    "Broker PVM Petroleum": extract_data_pvm_petroleum,
     # Add more broker and values here...
 }
 
+# Helper function to define broker from broker file
 def identify_broker(sheet):
     for row in sheet.iter_rows(values_only=True):
         for cell in row:
             if isinstance(cell, str):
                 if 'LINK CRUDE RESOURCES, LLC' in cell:
-                    print("found Broker Link Crude")
+                    #print("found Broker Link Crude")
                     return 'Broker Link Crude'
                 if 'None None' in cell:
-                    print("found Broker Citron Commodities")
+                    #print("found Broker Citron Commodities")
                     return 'Broker Citron Commodities'
                 if 'CalRock Brokers Inc.' in cell:
-                    print("found Broker CalRock Brokers")
+                    #print("found Broker CalRock Brokers")
                     return 'Broker CalRock Brokers'
                 if 'Click & Trade' in cell:
-                    print("found Broker Modern Commodities")
+                    #print("found Broker Modern Commodities")
                     return 'Broker Modern Commodities'
                 if 'ONE EXCHANGE' in cell:
-                    print("found Broker One Exchange")
+                    #print("found Broker One Exchange")
                     return 'Broker One Exchange'
                 if 'One Exchange' in cell:
-                    print("found Broker One Exchange")
+                    #print("found Broker One Exchange")
                     return 'Broker One Exchange'
                 if 'SYNTEXENERGY' in cell:
                     return 'Broker Syntex Energy'
@@ -112,8 +126,16 @@ def identify_broker(sheet):
                     return 'Broker Syntex Energy'
                 if 'Marex' in cell:
                     return 'Broker Marex Spectron'
+                if 'TP ICAP' in cell:
+                    return 'Broker TP ICAP'
+                if 'Sage Refined' in cell:
+                    return 'Broker Sage Refined'
+                if 'Special Conditions : ' in cell:
+                    return 'Broker Axis Brokerage'
+                if 'PVM Petroleum' in cell:
+                    return 'Broker PVM Petroleum'
 
-    # If no broker found, return None
+    # If no broker found, return None 
     print("Broker not found")
     return None
 
@@ -133,6 +155,9 @@ def extract_data(sheet, file_name):
 
 
 # Printing the data collected to the corresponding excel files, including constant data
+# Note that this pulls data based on the location of elements, not by the name. Be EXTREMELY Careful when adding / moving items
+#   from this function, as it can easily mess up a lot of data. 
+# Perhaps change function to hashtable or others in the future, or add straight to the end. 
 def update_sheet(sheet, data, filename):
     transaction_date, transaction_type, seller, buyer, pipeline, location, trader, quantityA, quantityB, quantityC, broker, brokerDocID, \
     pricingDetail, pricingType, premium, paymentTerm, creditTerm, delivery_date_start, delivery_date_end, id_, team, currency, deliveryTerm = data or ""
@@ -160,7 +185,6 @@ def update_sheet(sheet, data, filename):
     except AttributeError:
         sheet['B8'] = delivery_date_start
         sheet['B9'] = delivery_date_end
-
     sheet['B10'] = quantityA or ""
     sheet['B11'] = quantityB or ""
     sheet['B12'] = quantityC or ""
@@ -189,6 +213,7 @@ def update_sheet(sheet, data, filename):
     sheet['B34'] = brokerDocID or ""
     sheet['B35'] = id_ or ""
     
+    # See if the broker and pipeline info is found, print filename if not
     if not sheet['B14'].value:
         recognization[filename] = False
     if sheet['B35'].value == 'no corresponding pipeline implis no correct id':

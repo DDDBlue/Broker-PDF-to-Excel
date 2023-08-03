@@ -55,9 +55,7 @@ def extract_data_one_exchange(sheet):
                         date_end = match_end.group(1).strip()
                         try:
                             delivery_date_start = datetime.strptime(date_start, '%B %d, %Y')  # convert to datetime object
-                            formatted_date_start = delivery_date_start.strftime('%m/%d/%Y')  # convert to 'M/D/YYYY' format
                             delivery_date_end = datetime.strptime(date_end, '%B %d, %Y')  # convert to datetime object
-                            formatted_date_end = delivery_date_end.strftime('%m/%d/%Y')  # convert to 'M/D/YYYY' format
                         except ValueError:
                             print("The date format is incorrect.")
                 elif 'Transaction ID:' in cell:

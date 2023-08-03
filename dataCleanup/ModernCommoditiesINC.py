@@ -70,7 +70,6 @@ def extract_data_modern_commodities(sheet):
                         formatted_date_start = delivery_date_start.strftime('%m/%d/%Y')  # convert to 'M/D/YYYY' format
                     except ValueError:
                         print("The date format is incorrect.")
-                        return
                     delivery_date_end = datetime(delivery_date_start.year, delivery_date_start.month, 1) + timedelta(days=32)
                     delivery_date_end = delivery_date_end.replace(day=1) - timedelta(days=1)
 
